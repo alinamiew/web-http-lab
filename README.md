@@ -25,3 +25,7 @@ uvicorn main:app --reload
 
 
 HTTP и FastAPI
+
+## Заметки
+`GET /notes` список сохранённых заметок
+`POST /notes` заголовок `title` и текст `content`, создаёт заметку с `id` и возвращает статус `201`
