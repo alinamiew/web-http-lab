@@ -1,6 +1,15 @@
 from fastapi import FastAPI, Response,HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
+import os 
+database_url = os.environ["DATABASE_URL"]
+
+postgres_dll_directory = os.add_dll_directory(r"C:\Program Files\PostgreSQL\18\bin")
+import psycopg 
+
+from psycopg.rows import dict_row
+
+
 
 app = FastAPI(title="Notes API", version="0.1.0")
 
@@ -16,31 +25,32 @@ class NoteCreate(BaseModel):
   title: str = Field(min_length = 1, max_length = 80)
   content: str= Field(min_length = 1, max_length = 500)
 
-notes = []
-next_id = 1
+
 
 @app.get("/notes")
 def notes_list():
-  return notes
+  with psycopg.connect(database_url, row_factory=dict_row) as conn:
+    cursor = conn.execute("SELECT id, title,content FROM notes")
+    rows = cursor.fetchall()
+  return rows
 
 @app.post("/notes", status_code=201)
 def note_create(data: NoteCreate):
-  global next_id  
-  note = {
-    "id" : next_id,
-    "title": data.title,
-    "content": data.content,
-  }
-  notes.append(note)
-  next_id +=1
+  with  psycopg.connect(database_url, row_factory=dict_row) as conn:
+    cursor = conn.execute("INSERT INTO notes (title, content) VALUES (%s, %s) RETURNING id, title, content", (data.title, data.content))
+    note = cursor.fetchone()
   return note
 
 @app.get("/notes/{note_id}")
 def notes_id(note_id: int):
-  for note in notes:
-      if note["id"] == note_id:
-        return note
-      raise HTTPException(status_code=404, detail="Note not found") 
+  with  psycopg.connect(database_url, row_factory=dict_row) as conn:
+    cursor = conn.execute("SELECT id, title, content FROM notes WHERE id = %s", (note_id,))
+    note = cursor.fetchone()
+  if note is None:
+    raise HTTPException(status_code=404, detail="Note not found") 
+  return note    
+      
+      
   
 
 
