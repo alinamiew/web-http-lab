@@ -4,7 +4,10 @@ from pydantic import BaseModel, Field
 import os 
 database_url = os.environ["DATABASE_URL"]
 
-postgres_dll_directory = os.add_dll_directory(r"C:\Program Files\PostgreSQL\18\bin")
+if os.name == "nt":
+  postgres_dll_directory = os.add_dll_directory(
+    r"C:\Program Files\PostgreSQL\18\bin")
+   
 import psycopg 
 
 from psycopg.rows import dict_row

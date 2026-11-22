@@ -1,6 +1,6 @@
 # web-http-lab
 
-HTTP и FastAPI
+HTTP и FastAPI. Заметки хранятся в PostgreSQL.
 
 ## Подготовка базы
 
@@ -10,7 +10,60 @@ HTTP и FastAPI
 
 Выбрать эту базу, открыть Query Tool, вставить SQL из schema.sql и выполнить. Таблицу нужно создать один раз в новой базе.
 
-## Установка зависимостей
+## Запуск через Docker
+
+Открыть Docker Desktop и дождаться Engine running. PostgreSQL работает на компьютере отдельно от контейнера.
+
+В терминале PowerShell в папке проекта собрать образ:
+
+```powershell
+docker build -t notes-api:0.1 .
+```
+
+Задать подключение к базе:
+
+```powershell
+$env:DATABASE_URL = 'postgresql://postgres:YOUR_PASSWORD@host.docker.internal:5432/web_http_lab'
+```
+
+Вместо YOUR_PASSWORD поставить свой пароль postgres. Специальные символы в пароле нужно закодировать для URL. Настоящий пароль в файлы проекта и на GitHub не добавлять.
+
+host.docker.internal — адрес компьютера из контейнера Docker Desktop. База web_http_lab и таблица notes должны быть созданы заранее.
+
+Запустить контейнер в фоне:
+
+```powershell
+docker run -d --name notes-api -p 8000:8000 -e DATABASE_URL notes-api:0.1
+```
+
+Порт 8000 на компьютере должен быть свободен. Открыть http://localhost:8000/docs.
+
+Посмотреть состояние и логи:
+
+```powershell
+docker ps -a
+docker logs notes-api
+```
+
+Остановить контейнер и снова запустить:
+
+```powershell
+docker stop notes-api
+docker start notes-api
+```
+
+Если контейнер notes-api уже существует, для повторного запуска использовать docker start. После изменения кода нужно снова собрать образ и пересоздать контейнер:
+
+```powershell
+docker build -t notes-api:0.1 .
+docker stop notes-api
+docker rm notes-api
+docker run -d --name notes-api -p 8000:8000 -e DATABASE_URL notes-api:0.1
+```
+
+Перед созданием нового контейнера DATABASE_URL должна быть задана в текущем терминале. Заметки остаются в PostgreSQL при остановке и удалении контейнера API.
+
+## Запуск без Docker на Windows
 
 В терминале PowerShell в папке проекта:
 
@@ -19,8 +72,6 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-## Подключение к базе
-
 В том же терминале задать переменные:
 
 ```powershell
@@ -28,13 +79,11 @@ $env:DATABASE_URL = 'postgresql://postgres:YOUR_PASSWORD@localhost:5432/web_http
 $env:PSYCOPG_IMPL = 'python'
 ```
 
-Вместо YOUR_PASSWORD поставить свой пароль postgres. Если в пароле есть специальные символы, их нужно закодировать для URL. Настоящий пароль в файлы проекта и на GitHub не добавлять. После открытия нового терминала переменные нужно задать заново.
+Вместо YOUR_PASSWORD поставить свой пароль. После открытия нового терминала переменные нужно задать заново.
 
-Используется Python-версия psycopg и библиотеки установленного PostgreSQL. В main.py указан путь C:\Program Files\PostgreSQL\18\bin. Эти шаги запуска рассчитаны на Windows и PostgreSQL 18 в этой папке. Если PostgreSQL установлен в другом месте, путь в main.py нужно поменять.
+Для запуска на Windows в main.py указан путь C:\Program Files\PostgreSQL\18\bin. Если PostgreSQL установлен в другом месте, этот путь нужно поменять. В Linux-контейнере эта настройка пропускается.
 
-## Запуск
-
-В том же терминале:
+Запустить приложение:
 
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn main:app --reload
@@ -44,28 +93,28 @@ $env:PSYCOPG_IMPL = 'python'
 
 Открыть в браузере:
 
-- http://127.0.0.1:8000/health — `GET /health`, проверка, что приложение работает
-- http://127.0.0.1:8000/hello — `GET /hello`, приветствие
-- http://127.0.0.1:8000/docs — здесь можно проверить маршруты
+- http://localhost:8000/health — GET /health, проверка, что приложение работает
+- http://localhost:8000/hello — GET /hello, приветствие
+- http://localhost:8000/docs — здесь можно проверить маршруты
 
 ## Заметки
 
-- `GET /notes` — список сохранённых заметок. Если заметок нет, вернётся `[]`.
-- `POST /notes` — принимает заголовок `title` и текст `content`, создаёт заметку с `id` и возвращает статус `201`.
-- `GET /notes/{note_id}` — показывает одну заметку по её `id`. Если заметки нет, вернётся `404` и `{"detail":"Note not found"}`.
+- GET /notes — список сохранённых заметок. Если заметок нет, вернётся [].
+- POST /notes — принимает заголовок title и текст content, создаёт заметку с id и возвращает статус 201.
+- GET /notes/{note_id} — показывает одну заметку по её id. Если заметки нет, вернётся 404 и {"detail":"Note not found"}.
 
-Пример запроса `POST /notes`:
+Пример запроса POST /notes:
 
 ```json
 {"title": "Покупки", "content": "Купить корм"}
 ```
 
-Пример ответа `201` (id выдаёт база):
+Пример ответа 201 (id выдаёт база):
 
 ```json
 {"id": 1, "title": "Покупки", "content": "Купить корм"}
 ```
 
-Заметки хранятся в PostgreSQL и остаются после перезапуска приложения.
+В /docs создать заметку через POST, запомнить её id и получить через GET /notes/{note_id}. Должен вернуться статус 200 и та же заметка. Для отсутствующего id ожидается 404.
 
-Для проверки создать заметку через POST в /docs и запомнить её id. Остановить приложение через Ctrl+C, запустить снова и получить заметку через GET /notes/{note_id}. Должен вернуться статус 200 и та же заметка.
+Заметки хранятся в PostgreSQL и остаются после перезапуска приложения. Для проверки перезапустить API или контейнер и получить заметку по прежнему id.
